@@ -97,11 +97,12 @@ export default function OnboardingPage() {
     setLoading(true)
 
     try {
-      const { data: household, error: hError } = await supabase
-        .from('households')
-        .select()
-        .eq('invite_code', joinCode.toUpperCase())
-        .single()
+      // Use RPC to bypass RLS — the user has no household_id yet so a direct
+      // SELECT on `households` would return 0 rows even with a valid code.
+      const { data: rows, error: hError } = await supabase
+        .rpc('find_household_by_invite_code', { code: joinCode })
+
+      const household = rows?.[0] ?? null
 
       if (hError || !household) {
         toast({ title: 'Código inválido', description: 'Verifique o código e tente novamente.', variant: 'destructive' })
