@@ -670,6 +670,18 @@ export interface Database {
     Views: Record<string, never>
     Functions: {
       get_household_id: { Args: Record<string, never>; Returns: string }
+      find_household_by_invite_code: {
+        Args: { code: string }
+        Returns: {
+          id: string
+          name: string
+          invite_code: string
+          has_children: boolean
+          has_pets: boolean
+          created_at: string
+          updated_at: string
+        }[]
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
