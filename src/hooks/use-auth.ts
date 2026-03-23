@@ -7,24 +7,14 @@ export function useAuthListener() {
   const { setUser, setSession, setProfile, setHousehold, setLoading, reset } = useAuthStore()
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-
-      if (session?.user) {
-        await loadUserData(session.user.id)
-      }
-      setLoading(false)
-    })
-
-    // Listen for auth changes
+    // onAuthStateChange fires INITIAL_SESSION on mount — no need to call
+    // getSession() separately (avoids navigator.locks race in StrictMode)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
 
-        if (event === 'SIGNED_IN' && session?.user) {
+        if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
           await loadUserData(session.user.id)
         } else if (event === 'SIGNED_OUT') {
           reset()
