@@ -40,10 +40,12 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false)
 
   async function createHousehold() {
-    if (!user) return
     setLoading(true)
 
     try {
+      const userId = user?.id ?? (await supabase.auth.getUser()).data.user?.id
+      if (!userId) throw new Error('Usuário não autenticado')
+
       const code = generateInviteCode()
       const householdId = crypto.randomUUID()
       setCreatedCode(code)
@@ -60,7 +62,7 @@ export default function OnboardingPage() {
       const { data: profile, error: pError } = await supabase
         .from('profiles')
         .update({ household_id: householdId, role: 'owner' })
-        .eq('id', user.id)
+        .eq('id', userId)
         .select()
         .single()
 
@@ -93,10 +95,14 @@ export default function OnboardingPage() {
   }
 
   async function joinHousehold() {
-    if (!user) return
     setLoading(true)
 
     try {
+      // `user` from the store may be null if onAuthStateChange hasn't fired yet —
+      // fall back to a direct session check so the action never silently no-ops.
+      const userId = user?.id ?? (await supabase.auth.getUser()).data.user?.id
+      if (!userId) throw new Error('Usuário não autenticado')
+
       // Use RPC to bypass RLS — the user has no household_id yet so a direct
       // SELECT on `households` would return 0 rows even with a valid code.
       const { data: rows, error: hError } = await supabase
@@ -111,8 +117,8 @@ export default function OnboardingPage() {
 
       const { data: profile, error: pError } = await supabase
         .from('profiles')
-        .update({ household_id: household.id, role: 'partner' })
-        .eq('id', user.id)
+        .update({ household_id: household.id, role: 'partner', onboarding_done: true })
+        .eq('id', userId)
         .select()
         .single()
 
@@ -120,11 +126,6 @@ export default function OnboardingPage() {
 
       setHousehold(household)
       setProfile(profile)
-
-      await supabase
-        .from('profiles')
-        .update({ onboarding_done: true })
-        .eq('id', user.id)
 
       toast({ title: 'Lar encontrado!', description: `Você entrou em "${household.name}"` })
       navigate('/')
