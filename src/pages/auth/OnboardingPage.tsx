@@ -45,28 +45,39 @@ export default function OnboardingPage() {
 
     try {
       const code = generateInviteCode()
+      const householdId = crypto.randomUUID()
       setCreatedCode(code)
 
-      const { data: household, error: hError } = await supabase
+      // Insert without .select() — SELECT policy requires household_id on profile
+      // which isn't set yet, so it would return 0 rows and fail
+      const { error: hError } = await supabase
         .from('households')
-        .insert({ name: householdName, invite_code: code })
-        .select()
-        .single()
+        .insert({ id: householdId, name: householdName, invite_code: code })
 
       if (hError) throw hError
 
+      // Update profile first so get_household_id() works for subsequent queries
       const { data: profile, error: pError } = await supabase
         .from('profiles')
-        .update({ household_id: household.id, role: 'owner' })
+        .update({ household_id: householdId, role: 'owner' })
         .eq('id', user.id)
         .select()
         .single()
 
       if (pError) throw pError
 
+      // Now get_household_id() returns householdId — SELECT policy passes
+      const { data: household, error: fetchError } = await supabase
+        .from('households')
+        .select()
+        .eq('id', householdId)
+        .single()
+
+      if (fetchError) throw fetchError
+
       // Seed default categories
       await supabase.from('transaction_categories').insert(
-        DEFAULT_CATEGORIES.map((c) => ({ ...c, household_id: household.id }))
+        DEFAULT_CATEGORIES.map((c) => ({ ...c, household_id: householdId }))
       )
 
       setHousehold(household)
@@ -74,8 +85,8 @@ export default function OnboardingPage() {
       setInviteCode(code)
       setStep('modules')
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erro ao criar lar'
-      toast({ title: 'Erro', description: message, variant: 'destructive' })
+      const msg = (err as { message?: string })?.message ?? 'Erro ao criar lar'
+      toast({ title: 'Erro', description: msg, variant: 'destructive' })
     } finally {
       setLoading(false)
     }
