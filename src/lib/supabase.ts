@@ -14,6 +14,9 @@ export const supabase = createClient<Database>(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      // Use a simple mutex instead of navigator.locks to avoid
+      // "lock was stolen" errors when concurrent auth operations collide.
+      lock: async (_name, _acquireTimeout, fn) => fn(),
     },
     realtime: {
       params: {
